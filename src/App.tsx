@@ -337,13 +337,7 @@ function App() {
         />
       )}
 
-      <Suspense
-        fallback={
-          <div className="loading-container">
-            <div className="spinner" />
-          </div>
-        }
-      >
+      <Suspense fallback={<GridSkeleton />}>
         {currentScreen === "calibration" && (
           <CalibrationScreen
             selectedExercise={selectedExercise}
@@ -512,3 +506,5 @@ function App() {
 }
 
 export default App;
+
+// TODO: Consider adding more comprehensive JSDoc comments

@@ -691,3 +691,5 @@ export default {
   deleteWorkout,
   clearAllWorkouts,
 };
+
+// TODO: Consider adding more comprehensive JSDoc comments

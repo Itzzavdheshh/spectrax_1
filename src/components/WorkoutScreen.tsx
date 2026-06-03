@@ -52,7 +52,7 @@ interface WorkoutScreenProps {
   adaptiveFactor?: number;
 }
 
-type WorkoutPanelId = "focus" | "timer" | "reps" | "engine" | "sense";
+type WorkoutPanelId = "focus" | "timer" | "reps" | "engine" | "sense" | "dial";
 
 type PanelPosition = {
   x: number;
@@ -77,6 +77,7 @@ const getDefaultPanelPositions = (): PanelPositions => {
     reps: { x: Math.max(width / 2 - 110, 30), y: Math.max(height - 250, 30) },
     engine: { x: 40, y: Math.max(height - 110, 30) },
     sense: { x: 280, y: Math.max(height - 110, 30) },
+    dial: { x: Math.max(width - 230, 30), y: 150 },
   };
 };
 
@@ -174,15 +175,16 @@ export const WorkoutScreen: React.FC<WorkoutScreenProps> = ({ exercise, onEnd, o
       timer: React.createRef<HTMLDivElement>(),
       reps: React.createRef<HTMLDivElement>(),
       engine: React.createRef<HTMLDivElement>(),
-      sense: React.createRef<HTMLDivElement>()
+      sense: React.createRef<HTMLDivElement>(),
+      dial: React.createRef<HTMLDivElement>()
     };
   }
 
   const panelRefsById = panelRefs.current;
-const [panelsLocked, setPanelsLocked] = useState(true);
-const [cameraError, setCameraError] = useState<string | null>(null);
-const [panelPositions, setPanelPositions] = useState<PanelPositions>(() => getStoredPanelPositions());
-const [showExitModal, setShowExitModal] = useState(false);
+  const [panelsLocked, setPanelsLocked] = useState(true);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const [panelPositions, setPanelPositions] = useState<PanelPositions>(() => getStoredPanelPositions());
+  const [showExitModal, setShowExitModal] = useState(false);
   const { config: displayConfig, updateConfig: updateDisplayConfig } = useDisplayConfig();
   const [seconds, setSeconds] = useState(0);
   const [vlmProgress, setVlmProgress] = useState(0);
@@ -250,6 +252,7 @@ const animationFrameRef = useRef<number | null>(null);
 const [gestureConfidences, setGestureConfidences] = useState<Record<string, number>>({});
 const [lastGestureCommand, setLastGestureCommand] = useState<GestureCommand | null>(null);
 const [gestureHudVisible, setGestureHudVisible] = useState(false);
+const [currentAngle, setCurrentAngle] = useState<number>(0);
 const gestureHudTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 const workoutControlRef = useRef<'idle' | 'running' | 'paused'>('idle');
@@ -372,7 +375,6 @@ const [hasGhost, setHasGhost] = useState(false);
   }, [mismatchError]);
 
 
-  const wsSocketRef = useRef<WebSocket | null>(null);
   const offscreenEnabledRef = useRef<boolean>(false);
   const { initOffscreenCanvas } = useOffscreenCanvas();
 
@@ -380,6 +382,11 @@ const [hasGhost, setHasGhost] = useState(false);
     // ── SINGLE USER LOCK: Filter out erratic detections or second people ──
     const filteredResults = poseLockService.filter(results);
     if (!filteredResults || !filteredResults.poseLandmarks) return;
+
+    // Calculate primary joint angle on every frame for real-time dial updates
+    const currentFrameAngles = getJointAngles(results.poseLandmarks);
+    const primaryJoint = exercise.primaryJoint || 'knee';
+    setCurrentAngle(currentFrameAngles[primaryJoint] || 0);
 
     // ── GESTURE COMMAND PARSING ─────────────────────────────────────────────
     const gestureResult = gestureService.analyze(results.poseLandmarks);
@@ -452,7 +459,9 @@ const [hasGhost, setHasGhost] = useState(false);
               ? "jumpingJack"
               : label.includes("bicep curl")
                 ? "bicepCurl"
-                : "";
+                : label.includes("chest press")
+                  ? "chestPressPunches"
+                  : "";
 
       if (
         detectedKey &&
@@ -990,6 +999,7 @@ mistakes:Object.keys(finalMistakes),
         {renderDraggablePanel('reps', '', <RepsPanel reps={engineState.reps} statusColor={statusColor} />)}
         {renderDraggablePanel('engine', '', <EnginePanel status={engineState.status} statusColor={statusColor} />)}
         {renderDraggablePanel('sense', '', <SensePanel clipEngine={clipEngine} clipResult={clipResult} />)}
+        {renderDraggablePanel('dial', '', <AngleDialPanel angle={currentAngle} label={exercise.primaryJoint} statusColor={statusColor} />)}
       </div>
 
       {/* MID-SET MISMATCH ALERT */}
